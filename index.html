@@ -310,7 +310,7 @@ a{color:var(--grid-strong)}
 .dots i.w{border-color:var(--r-who)}.dots i.w.on{background:var(--r-who)}
 img.noimg{visibility:hidden}
 
-@font-face{font-family:"ZaojuKai";src:url("img/kai.woff2?v=6") format("woff2");font-display:swap}
+@font-face{font-family:"ZaojuKai";src:url("img/kai.woff2?v=7") format("woff2");font-display:swap}
 @font-face{font-family:"ZaojuZhuyin";src:url("img/zhuyin.woff2?v=5") format("woff2");font-display:swap}
 html.zy{--font-text:"ZaojuZhuyin","LXGW WenKai TC","BiauKai","DFKai-SB",serif;--font-ui:"ZaojuZhuyin","Chiron GoRound TC","PingFang TC","Microsoft JhengHei",sans-serif}
 html.zy .gz span{font-size:calc(var(--cell)*.56)}
@@ -402,6 +402,7 @@ a.ghost{text-decoration:none;color:inherit;display:inline-flex;align-items:cente
 .draft-note{margin:0 0 4px;color:var(--muted)}.draft-note .ghost{font-size:13px;padding:2px 10px;margin-left:6px}
 .wr-choose{display:grid;gap:6px;background:#f3f8f4;border-radius:14px;padding:10px 12px}.wr-topic{font:400 18px var(--font-text);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .wr-choose{background:#1f2b24}}
+.cy-from{margin:6px 0 0;font:700 14px var(--font-ui);color:var(--muted);text-align:right}
 </style>
 
 <div class="wrap">
@@ -11070,7 +11071,7 @@ function cyLesson(x,st){rememberLast('cy',x.id,st);
   const next=()=>st<2?h('button',{class:'primary',onclick:()=>cyLesson(x,st+1)},'下一關 →'):h('button',{class:'primary',onclick:home},'選下一個成語');
   if(st===0){
     const box=h('div',{style:'display:grid;gap:12px'});
-    panel.append(h('p',{class:'ask'},'讀一讀典故'),h('div',{class:'cy-story'},h('p',{},x.story)),h('div',{class:'btn-row'},speakBtn(()=>x.story,'唸典故給我聽')),box);
+    panel.append(h('p',{class:'ask'},'讀一讀典故'),h('div',{class:'cy-story'},h('p',{},x.story),x.from?h('p',{class:'cy-from'},'出處：'+x.from):null),h('div',{class:'btn-row'},speakBtn(()=>x.story,'唸典故給我聽')),box);
     runChoice(box,[{q:`讀完故事，「${x.w}」是什麼意思？`,o:[[x.mean,1,''],...x.wrong.map(w=>[w,0,'和故事的意思不一樣，再讀一次典故。'])]}],{pass:1,win:'懂了寓意！得到一顆星',done:()=>{done();box.append(h('div',{class:'cy-rel'},
       x.near?h('span',{class:'chip c-time'},'近義：'+x.near):null,x.opp?h('span',{class:'chip c-who'},'反義：'+x.opp):null))},next});
   }else if(st===1){
