@@ -396,6 +396,12 @@ a.ghost{text-decoration:none;color:inherit;display:inline-flex;align-items:cente
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .wr-sent.fx-bad{background:#4a1f1f}}
 .brand-txt{display:grid;text-align:left;gap:1px}.brand-tag{font:400 13px/1.3 var(--font-text);color:var(--muted);white-space:nowrap}.brand-sub{font:400 12px/1.3 var(--font-ui);color:var(--muted);white-space:nowrap}
 @media (max-width:760px){.brand-sub{display:none}}@media (max-width:480px){.brand-tag{font-size:11px;white-space:normal}.brand-tag>span{display:inline-block;white-space:nowrap}}
+.resume{display:flex;align-items:center;gap:10px;width:100%;margin:6px 0 10px;border:2.5px solid var(--key);background:var(--key-bg);color:var(--ink);border-radius:14px;padding:10px 14px;font:700 17px var(--font-text);text-align:left}
+.resume-k{background:var(--key);color:#fff;border-radius:999px;padding:2px 10px;font-size:14px;white-space:nowrap}
+.fbk{margin:0 0 4px;font-size:.98rem;line-height:1.7}.timer-tg{font-size:14px;padding:4px 12px;margin:4px 0}.timer-off{display:grid;gap:6px}
+.draft-note{margin:0 0 4px;color:var(--muted)}.draft-note .ghost{font-size:13px;padding:2px 10px;margin-left:6px}
+.wr-choose{display:grid;gap:6px;background:#f3f8f4;border-radius:14px;padding:10px 12px}.wr-topic{font:400 18px var(--font-text);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .wr-choose{background:#1f2b24}}
 </style>
 
 <div class="wrap">
@@ -4381,7 +4387,34 @@ function markDone(id,st){const a=prog[id]||[];if(a.includes(st)){updStars();retu
   if(id.startsWith('grow-')){const gg=GROW[+id.slice(5)];if(gg)setTimeout(()=>award(gg.img,'句子長大了：'+gg.who+gg.act),650)}
   updSticker()}
 function updStars(){$('#starCount span').textContent=totalStars()}
-function saveWork(p,s){works.unshift({p,s,t:Date.now()});works=works.slice(0,200);store.set('zjgf-works',works)}
+/* ============ 兒童友善：草稿自動保存、計時開關、繼續上次、手機鍵盤 ============ */
+let drafts=store.get('zjgf-drafts',{});
+const VSX=/[\u{E0100}-\u{E01EF}]/gu;
+function draftScope(){const head=(document.querySelector('#app .pat-head h2')?.textContent||'').replace(VSX,'');const tag=(document.querySelector('#app .step[aria-current="step"] b')?.textContent||'').replace(VSX,'');return head+'|'+tag}
+function hookDraft(ta){if(ta.dataset.dk)return;const all=[...app.querySelectorAll('textarea')];const k=draftScope()+'|'+all.indexOf(ta)+'|'+(ta.placeholder||'').slice(0,16);ta.dataset.dk=k;
+  if(!ta.value&&drafts[k]&&drafts[k].t){ta.value=drafts[k].t;setTimeout(()=>ta.dispatchEvent(new Event('input',{bubbles:true})),0);
+    const note=h('p',{class:'small draft-note'},'📝 已接著上次寫到一半的地方。',h('button',{class:'ghost',onclick:()=>{ta.value='';delete drafts[k];store.set('zjgf-drafts',drafts);ta.dispatchEvent(new Event('input',{bubbles:true}));note.remove()}},'清空重寫'));ta.before(note)}
+  let tmr;ta.addEventListener('input',()=>{clearTimeout(tmr);tmr=setTimeout(()=>{if(ta.value.trim())drafts[k]={t:ta.value,at:Date.now()};else delete drafts[k];
+    const ks=Object.keys(drafts);if(ks.length>150)ks.sort((a,b)=>drafts[a].at-drafts[b].at).slice(0,ks.length-150).forEach(x=>delete drafts[x]);store.set('zjgf-drafts',drafts)},400)})}
+new MutationObserver(()=>app.querySelectorAll('textarea:not([data-dk])').forEach(hookDraft)).observe(app,{childList:true,subtree:true});
+function clearScopeDrafts(){const sc=draftScope()+'|';let ch=false;for(const k of Object.keys(drafts))if(k.startsWith(sc)){delete drafts[k];ch=true}if(ch)store.set('zjgf-drafts',drafts)}
+const timerOn=()=>store.get('zjgf-timer','on')!=='off';
+function timerToggle(rerun){return h('button',{class:'ghost timer-tg',onclick:()=>{store.set('zjgf-timer',timerOn()?'off':'on');sfx('tap');rerun()}},timerOn()?'⏱ 計時中・改成不計時練習':'⏸ 不計時練習・改回計時挑戰')}
+function rememberLast(k,id,st){store.set('zjgf-last',{k,id,st:st||0,at:Date.now()})}
+function resumeBtn(){const L=store.get('zjgf-last',null);if(!L)return null;let f=null,name='';
+  try{if(L.k==='p'){const x=P.find(y=>y.id===L.id);if(x&&bookHas((x.g||2)+x.b)){f=()=>pattern(x,L.st);name='造句｜'+x.p}}
+    else if(L.k==='w'){const x=WL.find(y=>y.id===L.id);if(x&&bookHas(x.g+x.b)){f=()=>wordLesson(x,L.st);name='造詞｜'+x.l.replace(/^[^、]+、/,'')}}
+    else if(L.k==='cy'){const x=CYL.find(y=>y.id===L.id);if(x&&bookHas('cy')){f=()=>cyLesson(x,L.st);name='成語｜'+x.w}}
+    else if(L.k==='xc'){const x=XCL.find(y=>y.id===L.id);if(x&&bookHas('xc')){f=()=>xcLesson(x,L.st);name='修辭｜'+x.name}}
+    else if(L.k==='wr'){const x=wrShown().find(y=>y.id===L.id);if(x){f=()=>wrLesson(x,L.st);name='寫作｜'+x.name}}
+    else if(L.k==='fx'){const x=FXL.find(y=>y.id===L.id);if(x&&bookHas('fx')){f=()=>fxLesson(x);name='修繕｜'+x.title}}
+    else if(L.k==='s'){const x=SKILLS.find(y=>y.id===L.id);if(x&&bookHas('4')){f=()=>skill(x,L.st);name=x.name}}}catch(e){}
+  if(!f)return null;
+  return h('button',{class:'resume',onclick:()=>{sfx('tap');f()}},h('span',{class:'resume-k'},'▶ 繼續上次'),h('span',{},name))}
+document.addEventListener('focusin',e=>{const t=e.target;if(t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&t.type==='text'))&&window.innerWidth<760)setTimeout(()=>{try{t.scrollIntoView({block:'center',behavior:'smooth'})}catch(_){}},350)});
+try{window.visualViewport&&window.visualViewport.addEventListener('resize',()=>{const a=document.activeElement;if(a&&a.tagName==='TEXTAREA'&&window.innerWidth<760)try{a.scrollIntoView({block:'center'})}catch(_){}})}catch(e){}
+
+function saveWork(p,s){works.unshift({p,s,t:Date.now()});works=works.slice(0,200);store.set('zjgf-works',works);clearScopeDrafts()}
 
 /* 朗讀 */
 const canSpeak = 'speechSynthesis' in window;
@@ -4655,9 +4688,10 @@ function stFlash(p,panel,done){
     else{combo=0;oops();fb.replaceChildren(h('p',{class:'fb no'},it.ok?'這句其實是通順的喔！':'這句有問題：'+(it.why||'意思不通順。')))}
     r++;if(r>=items.length)finish();else show();
   }
-  panel.replaceChildren(h('p',{class:'ask'},`${T} 秒內判斷：這個句子通順嗎？`),h('p',{class:'hint'},`答對 ${Math.ceil(items.length*0.7)} 題以上就過關。`),bar,meta,card,btns,fb);
+  if(!timerOn())bar.hidden=true;
+  panel.replaceChildren(h('p',{class:'ask'},timerOn()?`${T} 秒內判斷：這個句子通順嗎？`:'慢慢判斷：這個句子通順嗎？'),timerToggle(()=>stFlash(p,panel,done)),h('p',{class:'hint'},`答對 ${Math.ceil(items.length*0.7)} 題以上就過關。`),bar,meta,card,btns,fb);
   show();
-  timer=setInterval(()=>{if(!panel.isConnected){clearInterval(timer);return}left--;bar.firstChild.style.width=(left/T*100)+'%';if(left<=10)bar.classList.add('hurry');if(left<=0){finish()}},1000);
+  if(timerOn())timer=setInterval(()=>{if(!panel.isConnected){clearInterval(timer);return}left--;bar.firstChild.style.width=(left/T*100)+'%';if(left<=10)bar.classList.add('hurry');if(left<=0){finish()}},1000);
 }
 
 const coreDone=id=>[0,1,2,3].every(i=>(prog[id]||[]).includes(i));
@@ -4716,7 +4750,7 @@ function home4(){
   ];
 }
 
-function skill(s,st){
+function skill(s,st){rememberLast('s',s.id,st);
   app.replaceChildren();setGrade(4);const d=prog[s.id]||[];
   app.append(h('button',{class:'back',onclick:home},'← 回到四年級綜合挑戰'),
     h('div',{class:'pat-head'},h('h2',{},s.glyph+'｜'+s.name),h('span',{class:'from'},'四年級綜合挑戰')),
@@ -4729,17 +4763,18 @@ function skill(s,st){
 }
 function next4(s,st){return st<2?h('button',{class:'primary',onclick:()=>skill(s,st+1)},'下一關 →'):h('button',{class:'primary',onclick:home},'回到實驗室')}
 
-function timerBar(sec,onEnd){
+function timerBar(sec,onEnd,rerun){
+  if(!timerOn())return {bar:h('div',{class:'timer-off'},h('p',{class:'hint',style:'margin:0'},'⏸ 不計時練習：慢慢想，答完全部題目就結束。'),rerun?timerToggle(rerun):null),stop(){}};
   const bar=h('div',{class:'fl-bar'},h('i',{}));let left=sec;
   const t=setInterval(()=>{if(!bar.isConnected){clearInterval(t);return}left--;bar.firstChild.style.width=(left/sec*100)+'%';if(left<=10)bar.classList.add('hurry');if(left<=0){clearInterval(t);onEnd()}},1000);
-  return {bar,stop:()=>clearInterval(t)};
+  return {bar:h('div',{},bar,rerun?timerToggle(rerun):null),stop:()=>clearInterval(t)};
 }
 function endTimed(s,panel,score,total,done){
-  const prev=best4[s.id];const isBest=prev==null||score>prev;
+  const prev=best4[s.id];const isBest=timerOn()&&(prev==null||score>prev);
   if(isBest){best4[s.id]=score;store.set('zjgf-best4',best4)}
   const pass=score>=6;if(pass)done();else sfx('no');
-  panel.replaceChildren(h('p',{class:'ask'},`時間到！你答對了 ${score} 題。`),
-    isBest?h('p',{class:'fb ok'},`新的個人最佳紀錄：${score} 題！`):h('p',{class:'hint'},`你的個人最佳是 ${prev} 題，再挑戰看看能不能超越自己！`),
+  panel.replaceChildren(h('p',{class:'ask'},`${timerOn()?'時間到！':'練習完成！'}你答對了 ${score} 題。`),
+    isBest?h('p',{class:'fb ok'},`新的個人最佳紀錄：${score} 題！`):h('p',{class:'hint'},timerOn()?`你的個人最佳是 ${prev} 題，再挑戰看看能不能超越自己！`:'不計時練習不列入個人最佳紀錄。'),
     pass?winLine('限時挑戰過關！得到一顆星'):h('p',{class:'hint'},'答對 6 題以上就能過關。'),
     h('div',{class:'btn-row'},h('button',{class:'secondary',onclick:()=>skill(s,1)},'再挑戰一次'),pass?next4(s,1):null));
 }
@@ -4761,7 +4796,7 @@ function skillChoice(s,panel,done,timed){
     }},o)));
     panel.replaceChildren(...[timed?tm.bar:null,h('p',{class:'hint'},`第 ${r+1} 題／共 ${items.length} 題・答對 ${right}`),h('p',{class:'ask'},q),list,fb].filter(Boolean));
   };
-  if(timed){tm=timerBar(60,()=>{if(!over){over=true;endTimed(s,panel,right,items.length,done)}})}
+  if(timed){tm=timerBar(60,()=>{if(!over){over=true;endTimed(s,panel,right,items.length,done)}},()=>skill(s,1))}
   render();
 }
 
@@ -4785,7 +4820,7 @@ function skillMulti(s,panel,done,timed){
   };
   const finish=()=>{const pass=right>=Math.ceil(items.length*0.75);if(pass)done();
     panel.replaceChildren(h('p',{class:'ask'},`全對 ${right}／${items.length} 題`),pass?winLine('造詞高手！得到一顆星'):h('p',{class:'hint'},'要再多找對幾題才過關。'),h('div',{class:'btn-row'},h('button',{class:'secondary',onclick:()=>skill(s,0)},'再練一次'),pass?next4(s,0):null))};
-  if(timed){tm=timerBar(60,()=>{if(!over){over=true;endTimed(s,panel,right,items.length,done)}})}
+  if(timed){tm=timerBar(60,()=>{if(!over){over=true;endTimed(s,panel,right,items.length,done)}},()=>skill(s,1))}
   render();
 }
 
@@ -4797,12 +4832,17 @@ const BEAUTY=[
   ['心情',/開心|高興|快樂|難過|傷心|緊張|興奮|害怕|感動|得意|生氣|失望|驚訝|安心|放心|期待|捨不得|忍不住|笑|哭/,'寫出人物的心情或表情'],
   ['時間地點',/早上|中午|傍晚|晚上|清晨|夜|今天|昨天|放學|下課|週末|假日|春|夏|秋|冬|教室|學校|公園|家|操場|海邊|山上|街上|廚房|窗/,'交代什麼時候、在哪裡'],
 ];
+const PRAISE={'比喻':'用了比喻，讓讀者馬上聯想到畫面','疊字':'用了疊字，讀起來有節奏，動作也更生動','感官':'寫出看到、聽到或摸到的感覺，讀者彷彿就在現場','心情':'寫出了心情，讀者能感受到你的感覺','時間地點':'交代了時間或地點，讀者知道事情在哪裡發生'};
+const NEXTSTEP={'時間地點':'加上「什麼時候、在哪裡」，讓讀者知道事情發生的場景','感官':'加一個看到、聽到或聞到的細節，讓畫面更清楚','心情':'寫出當時的心情或表情，讓讀者感受你的感覺','比喻':'想一想它「像」什麼，用一個比喻讓讀者聯想','疊字':'用一個疊字（例如輕輕、慢慢）讓動作更生動'};
+const NEXT_ORDER=['時間地點','感官','心情','比喻','疊字'];
 function beautyBox(t){
-  const hit=BEAUTY.filter(([,re])=>re.test(t));
-  return h('div',{class:'beauty'},
-    h('p',{class:'beauty-h'},'✨ 寫作小提示：亮起來的是你已經用上的寫法（這不是分數，句子好不好要讀起來判斷）'),
-    h('div',{class:'beauty-row'},...BEAUTY.map(([n,re,tip])=>h('span',{class:'beauty-chip'+(re.test(t)?' on':''),title:tip},(re.test(t)?'★ ':'☆ ')+n))),
-    hit.length<2&&t?h('p',{class:'hint',style:'margin:4px 0 0'},'小點子：'+BEAUTY.find(([,re])=>!re.test(t))[2]+'。'):null);
+  const chips=BEAUTY.map(([n,re,tip])=>h('span',{class:'beauty-chip'+(t&&re.test(t)?' on':''),title:tip},(t&&re.test(t)?'★ ':'☆ ')+n));
+  if(!t)return h('div',{class:'beauty'},h('p',{class:'beauty-h'},'✨ 寫下句子後，這裡會告訴你做得好的地方，和下一步可以試試的方向。'),h('div',{class:'beauty-row'},...chips));
+  const hit=BEAUTY.filter(([,re])=>re.test(t)).map(x=>x[0]);
+  const goodTxt=hit.length?'你'+PRAISE[hit[0]]+(hit[1]?'；也'+PRAISE[hit[1]]:'')+'。':(/[。！？]」?$/.test(t)?'你寫出了一個完整的句子，意思清楚。':'你已經開始寫了，先把想說的話說完整，最後加上標點。');
+  const miss=NEXT_ORDER.find(n=>!hit.includes(n));const nextTxt=miss?NEXTSTEP[miss]+'。':'寫得很豐富了！再讀一遍，看看有沒有哪裡可以說得更簡潔。';
+  return h('div',{class:'beauty'},h('p',{class:'fbk'},h('b',{},'👍 做得好：'),goodTxt),h('p',{class:'fbk'},h('b',{},'👉 下一步：'),nextTxt),
+    h('div',{class:'beauty-row'},...chips),h('p',{class:'small',style:'margin:4px 0 0'},'這是寫作小提示，不是分數；句子好不好，要讀起來判斷。'));
 }
 function vocabFind(w){for(const V of [typeof V6!=='undefined'?V6:{},typeof V5!=='undefined'?V5:{},typeof V4!=='undefined'?V4:{},typeof V3!=='undefined'?V3:{},typeof V2!=='undefined'?V2:{}])for(const list of Object.values(V)){const v=list.find(x=>x.w===w);if(v)return v}return null}
 
@@ -10755,7 +10795,7 @@ function wordTile(w){
     h('span',{class:'dots','aria-hidden':'true'},[0,1,2,3,4,5,6,7].map(i=>h('i',{class:(d.includes(i)?'on':'')+(i>4?' g':' w')}))));
 }
 
-function wordLesson(w,st){
+function wordLesson(w,st){rememberLast('w',w.id,st);
   app.replaceChildren();setGrade(w.g);const d=prog[wKey(w)]||[];
   const stepBtn=(i,a,b2,extra)=>h('button',{class:'step'+extra+(d.includes(i)?' done':''),'aria-current':i===st?'step':false,onclick:()=>wordLesson(w,i)},h('b',{},a),b2);
   app.append(h('button',{class:'back',onclick:home},'← 回到冒險地圖'),
@@ -10928,8 +10968,9 @@ function wFlash(w,panel,done,next){
     card.textContent=pass?'挑戰成功！答對 '+right+'／'+order.length+' 題！':'答對 '+right+'／'+order.length+' 題，再挑戰一次！';
     if(pass){done();fb.replaceChildren(winLine('詞義快閃過關！'),h('button',{class:'secondary',onclick:()=>wFlash(w,panel,done,next)},'再玩一次'),next)}else fb.replaceChildren(h('button',{class:'primary',onclick:()=>wFlash(w,panel,done,next)},'再挑戰一次'))};
   function ans(yes){if(over)return;const it=order[r];if(yes===it.ok){right++;combo++;good();if(combo>=3)say(combo+' 連擊！',true);fb.replaceChildren()}else{combo=0;oops();fb.replaceChildren(h('p',{class:'fb no'},'「'+it.w+'」的意思是：'+it.real))}r++;if(r>=order.length)finish();else show()}
-  panel.replaceChildren(h('p',{class:'ask'},T+' 秒內判斷：詞語和意思配得起來嗎？'),bar,meta,card,btns,fb);show();
-  tm=setInterval(()=>{if(!panel.isConnected){clearInterval(tm);return}left--;bar.firstChild.style.width=(left/T*100)+'%';if(left<=10)bar.classList.add('hurry');if(left<=0&&!over)finish()},1000);
+  if(!timerOn())bar.hidden=true;
+  panel.replaceChildren(h('p',{class:'ask'},timerOn()?T+' 秒內判斷：詞語和意思配得起來嗎？':'慢慢判斷：詞語和意思配得起來嗎？'),timerToggle(()=>wFlash(w,panel,done,next)),bar,meta,card,btns,fb);show();
+  if(timerOn())tm=setInterval(()=>{if(!panel.isConnected){clearInterval(tm);return}left--;bar.firstChild.style.width=(left/T*100)+'%';if(left<=10)bar.classList.add('hurry');if(left<=0&&!over)finish()},1000);
 }
 
 /* ============ 注音（二、三年級）：注音字型＋依詞語自動選破音（教育部一字多音審訂表詞庫） ============ */
@@ -11019,7 +11060,7 @@ function homeCY(){
           h('span',{class:'cy-word'},x.w),h('span',{class:'tc-kind '+(x.src==='課文'?'s':'')},x.src==='課文'?'課文成語':'延伸成語'),
           h('span',{class:'dots','aria-hidden':'true'},[0,1,2].map(i=>h('i',{class:d.includes(i)?'on':''}))))})))))))];
 }
-function cyLesson(x,st){
+function cyLesson(x,st){rememberLast('cy',x.id,st);
   app.replaceChildren();setGrade(x.g);const d=prog[x.id]||[];
   app.append(h('button',{class:'back',onclick:home},'← 回到成語典故館'),
     h('div',{class:'pat-head'},h('h2',{},x.w),h('span',{class:'from'},`康軒${BOOKN[x.g+x.b]}・${x.l}・${x.src==='課文'?'課文成語':'延伸成語'}`)),
@@ -11061,7 +11102,7 @@ function homeXC(){
       h('span',{class:'lab-no'},`第 ${i+1} 種・${x.from}`),h('span',{class:'lab-glyph','aria-hidden':'true'},x.name[0]),h('span',{class:'tc-name'},x.name),
       h('span',{class:'dots','aria-hidden':'true'},[0,1,2,3].map(j=>h('i',{class:d.includes(j)?'on':''}))))}))];
 }
-function xcLesson(x,st){
+function xcLesson(x,st){rememberLast('xc',x.id,st);
   app.replaceChildren();setGrade(5);const d=prog[x.id]||[];
   app.append(h('button',{class:'back',onclick:home},'← 回到修辭工坊'),
     h('div',{class:'pat-head'},h('h2',{},'修辭｜'+x.name),h('span',{class:'from'},'康軒'+x.from)),stepNav(XC_STEPS,d,st,i=>xcLesson(x,i)));
@@ -11101,11 +11142,11 @@ const wrShown=()=>WTL.filter(t=>PAGE==='all'||(PAGE==='high'?t.g>=5:t.g<5));
 const SELFQ=[['語意清楚','讀的人能懂我想表達的意思嗎？'],['內容具體','有看得見、想像得到的細節嗎？'],['組織連貫','前後順序和句子之間的關係合理嗎？'],['想法感受','有寫出我的感受、理由或發現嗎？'],['自己修改','讀過一遍後，找到並改好要修改的地方了嗎？']];
 function selfQ(){return h('details',{class:'selfq',open:true},h('summary',{},'寫完問問自己'),h('ol',{},SELFQ.map(([a,b])=>h('li',{},h('b',{},a),'：',b))))}
 function selfCheck(id,onChange){
-  const st=SELFQ.map(()=>false);
+  const st=SELFQ.map(()=>false);const cbs=[];
   const el=h('div',{class:'selfcheck'},h('p',{class:'beauty-h'},'🔍 寫完了，用五個問題檢查自己（每一項都想過再打勾）'),
-    h('ul',{class:'checks'},SELFQ.map(([a,b],i)=>{const cb=h('input',{type:'checkbox',id:`sc-${id}-${i}`});cb.addEventListener('change',()=>{st[i]=cb.checked;onChange()});
+    h('ul',{class:'checks'},SELFQ.map(([a,b],i)=>{const cb=h('input',{type:'checkbox',id:`sc-${id}-${i}`});cbs.push(cb);cb.addEventListener('change',()=>{st[i]=cb.checked;onChange()});
       return h('li',{},h('label',{for:`sc-${id}-${i}`},cb,h('b',{},a),'：',b))})));
-  return {el,all:()=>st.every(Boolean)};
+  return {el,all:()=>st.every(Boolean),reset:()=>{cbs.forEach((c,i)=>{c.checked=false;st[i]=false})}};
 }
 const ROLE_CLS={'主題句':'r-top','結尾':'r-end','感受':'r-feel','例子':'r-ex','原因':'r-why','結果':'r-res','觀點':'r-top','理由':'r-why','反方':'r-res'};
 const roleTag=r=>h('span',{class:'rl '+(ROLE_CLS[r]||'r-mid')},r);
@@ -11123,7 +11164,7 @@ function homeWR(){
         h('span',{class:'lab-no'},t.kind),h('span',{class:'tc-name'},t.name),t.link?h('span',{class:'small'},t.link):null,
         h('span',{class:'dots','aria-hidden':'true'},[0,1,2].map(j=>h('i',{class:d.includes(j)?'on':''}))))}))))];
 }
-function wrLesson(t,st){
+function wrLesson(t,st){rememberLast('wr',t.id,st);
   app.replaceChildren();setGrade(t.g);const d=prog[t.id]||[];
   app.append(h('button',{class:'back',onclick:home},'← 回到寫作工坊'),
     h('div',{class:'pat-head'},h('h2',{},'寫作｜'+t.name),h('span',{class:'from'},`${BOOKN[t.g+t.b]}・${t.kind}${t.link?'・'+t.link:''}`)),
@@ -11158,16 +11199,26 @@ function wrLesson(t,st){
           h('div',{class:'bank'},p.bank.map(w=>h('button',{class:'tile zh small-tile',onclick:()=>{ta.value+=w;ta.focus();upd()}},w))),ta)}),
       prev,sc.el,checks);upd();
   }else{
-    const [minL,minS]=WR_MIN[t.g]||[80,4];
+    const [minL,minS]=WR_MIN[t.g]||[80,4];let v1=null,reader='';
+    const tIn=h('input',{type:'text',class:'wr-topic',value:t.free.topic,'aria-label':'我的題目'});
+    const topicNow=()=>t.g>=5?(tIn.value.trim()||t.free.topic):t.free.topic;
+    const rHint=h('p',{class:'small'},'');
+    const RD=[['同學','想一想：同學需要知道哪些背景？'],['家人','想一想：怎麼寫，家人讀了最有感覺？'],['低年級學弟妹','想一想：用詞要怎麼更好懂？例子要多舉一點嗎？'],['未來的自己','想一想：多年後再讀，你最想記住什麼？']];
+    const rRow=h('div',{class:'bank'},RD.map(([n,tip])=>{const b=h('button',{class:'tile zh small-tile',onclick:()=>{reader=reader===n?'':n;[...rRow.children].forEach(x=>x.classList.toggle('pick',x.textContent===reader));rHint.textContent=reader?tip:''}},n);return b}));
+    const chooseBox=h('div',{class:'wr-choose'},h('p',{class:'wr-slot-h'},'✏️ 題目可以改成你自己想寫的：'),tIn,h('p',{class:'wr-slot-h'},'這篇要寫給誰看？（可選）'),rRow,rHint);
     const ta=h('textarea',{class:'wr-free',rows:7,placeholder:'先寫一句說出主題，再寫細節，最後收尾。'});const checks=h('div',{style:'display:grid;gap:10px'});
     let sc;const upd=()=>{const s=ta.value.trim();const n=[...s].length;const ns=(s.match(/[。！？]/g)||[]).length;
       const li=(ok,x)=>h('li',{class:ok?'pass':''},h('span',{class:'mk','aria-hidden':'true'},ok?'✓':''),h('span',{},x));
       const c1=ns>=minS,c2=n>=minL,c3=/[。！？]」?$/.test(s);
       checks.replaceChildren(h('ul',{class:'checks'},li(c1,`至少 ${minS} 個句子（現在 ${ns} 句）`),li(c2,`大約 ${minL} 字以上（現在 ${n} 字）`),li(c3,'句尾有標點符號')),beautyBox(s),
         h('div',{class:'btn-row'},speakBtn(()=>s||t.free.topic,'唸我的段落'),
-          h('button',{class:'primary',disabled:!(c1&&c2&&c3&&sc.all()),onclick:()=>{saveWork('寫作工坊：'+t.free.topic,s);done();checks.append(winLine('你自己寫完一整段了！已放進作品集'),h('div',{class:'btn-row'},next()))}},'完成，放進作品集')))};
+          h('button',{class:'primary',disabled:!(c1&&c2&&c3&&sc.all()),onclick:()=>{saveWork('寫作工坊：'+topicNow()+(reader?`（寫給${reader}）`:'')+(v1?'（修改版）':''),s);done();
+          checks.append(winLine(v1?'修改完成！看看自己進步在哪裡':'你自己寫完一整段了！已放進作品集'),
+            v1?h('div',{class:'fx-cmp'},h('div',{},h('p',{class:'small'},'第一版'),h('p',{class:'wr-para'},v1)),h('div',{},h('p',{class:'small'},'修改後'),h('p',{class:'wr-para'},s))):h('span',{hidden:true}),
+            v1?h('p',{class:'mx-note'},'💡 比一比：你改了哪裡？讀的人會不會更清楚、更有感覺？'):h('span',{hidden:true}),
+            h('div',{class:'btn-row'},v1?null:h('button',{class:'secondary',onclick:()=>{v1=s;sc.reset();say('好！讀一讀第一版，找一個地方改得更好。',true);upd();ta.focus()}},'我想再修改'),next()))}},v1?'完成修改，放進作品集':'完成，放進作品集')))};
     sc=selfCheck(t.id+'f',upd);ta.addEventListener('input',upd);
-    panel.append(h('p',{class:'ask'},'題目：'+t.free.topic),
+    panel.append(h('p',{class:'ask'},'題目：'+t.free.topic),t.g>=5?chooseBox:h('span',{hidden:true}),
       h('details',{class:'mx-fold'},h('summary',{},'需要提示嗎？'),h('ol',{},t.free.tips.map(x=>h('li',{},x)))),
       h('details',{class:'mx-fold'},h('summary',{},'回頭看範文'),modelView()),ta,sc.el,checks);upd();
   }
@@ -11187,7 +11238,7 @@ function homeFX(){
       h('div',{class:'lab-grid'},FXL.filter(x=>x.g===g).map((x,i)=>{const ok=(prog[x.id]||[]).length>0;return h('button',{class:'lab-card'+(ok?' full':''),onclick:()=>{sfx('tap');fxLesson(x)}},
         h('span',{class:'lab-no'},`第 ${i+1} 段・${x.kind}`),h('span',{class:'tc-name'},x.title),h('span',{class:'dots','aria-hidden':'true'},h('i',{class:ok?'on':''})))}))))];
 }
-function fxLesson(x){
+function fxLesson(x){rememberLast('fx',x.id,0);
   app.replaceChildren();setGrade(x.g);
   const list=FXL.filter(y=>y.g===x.g);const idx=list.indexOf(x);const nx=list[idx+1];
   app.append(h('button',{class:'back',onclick:home},'← 回到文章修繕所'),
@@ -11216,7 +11267,8 @@ function bookHas(x){if(x==='wr')return wrShown().length>0;const hi=['5上','5下
   if(x==='4')return typeof SKILLS!=='undefined'&&SKILLS.some(s=>s.items.length);
   if(x==='cy')return CYL.length>0;if(x==='fx')return FXL.length>0;if(x==='xc')return XCL.length>0;
   return P.some(p=>(p.g||2)+p.b===x)||WL.some(w=>w.g+w.b===x)}
-function home(){
+function home(){home0();const r=resumeBtn();if(r)app.prepend(r)}
+function home0(){
   app.replaceChildren();
   if(!bookHas(book))book=Object.keys(BOOKN).find(bookHas)||'2上';
   setGrade(book==='4'||book==='wr'?4:(book==='cy'||book==='xc'||book==='fx')?5:+book[0]);
@@ -11262,7 +11314,7 @@ function home(){
 
 /* ============ 句型關卡 ============ */
 const STEP_NAMES=[['看一看','認識句型'],['排一排','排出句子'],['選一選','找出對的'],['寫一寫','自己造句']];
-function pattern(p,st){
+function pattern(p,st){rememberLast('p',p.id,st);
   app.replaceChildren();setGrade(p.g||2);
   const done=prog[p.id]||[];
   app.append(
@@ -11508,6 +11560,7 @@ function teacher(){
         h('p',{},'五項綜合挑戰（字形字音、詞語辨析、四字語詞填空、詞義判斷、一字變多詞）的題目，全部從四上、四下各課的造詞題庫與課文詞彙隨機抽出，適合單元複習或段考前練習。每項有三關：練習闖關（8 題，第一次就答對 6 題過關）、限時挑戰（60 秒，記錄個人最佳，不和別人比）、用詞造句。'),
         h('p',{},'設計依據：四年級正值「勤奮對自卑」的發展階段，喜歡看得見的進步與收集，所以用星星、收藏庫和個人最佳紀錄；此時仍以具體思考為主，所以每題都用部首、部件或生活情境說明「為什麼」；對公平很在意，所以只比自己、不排名。老師公開課省思也指出，學生會造詞卻不容易用詞寫出連貫的句子，因此每間實驗室最後都安排用詞造句。'),
         ),
+      h('div',{class:'t-sec'},h('h3',{},'兒童友善設定'),h('p',{},'寫作框會自動暫存草稿，重新整理或離開頁面後回來，可以接著寫；完成後草稿自動清除。首頁最上方有「繼續上次」，直接回到上次的關卡。限時挑戰與快閃遊戲可以在遊戲畫面上改成「不計時練習」，設定會記住，不計時練習不列入個人最佳紀錄。自己寫的句子與段落，會顯示「做得好」和「下一步」兩句回饋，不打分數。')),
       h('div',{class:'t-sec'},h('h3',{},'寫作工坊：從句子走到段落'),
         h('p',{},'依寫作鷹架的研究建議，中年級就開始練段落（主題句、細節、例子、結尾，以及因果、比較、擴寫、縮寫），避免到高年級才第一次接觸段落。每個任務三關，提示逐步撤除：① 讀範文、把打亂的句子排回去，看每句的角色，再比較兩段寫法的差別；② 照段落結構一格一格寫（有提示與詞庫）；③ 只給題目，自己寫一整段。'),
         h('p',{},'寫完後用五個問題自我檢查：語意清楚、內容具體、組織連貫、想法感受、自己修改。字數與「寫作小提示」只是參考，不代表作品品質；作品集裡的段落仍需要老師閱讀與回饋。'),
